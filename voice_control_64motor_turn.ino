@@ -1,4 +1,5 @@
 //3200motor 
+//含左右轉
 //PID
 float kp = 1;
 float ki = 0.003;
