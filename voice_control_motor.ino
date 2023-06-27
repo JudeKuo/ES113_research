@@ -1,6 +1,5 @@
 //3200motor+lidar
 #include <SoftwareSerial.h>   // 引用程式庫
-#include <MsTimer2.h>
 //PID
 float kp = 1;
 float ki = 0.003;
@@ -17,7 +16,7 @@ unsigned long t_prev = 0;
 volatile unsigned long count = 0;
 unsigned long count_prev = 0;
 //PID coef
-float Theta, RPM, RPM_d=0;
+volatile float Theta, RPM, RPM_d=0;
 float Theta_prev = 0;
 int dt;
 float RPM_max = 10;
@@ -166,30 +165,22 @@ void setup() {
   cli();
   TCCR1A = 0;
   TCCR1B = 0;
-  TCNT1 = 0;
-  OCR1A =12499; //Prescaler = 64  (12499)
-  TCCR1B |= (1 << WGM12);
-  TCCR1B |= (1 << CS11 | 1 << CS10);
-  TIMSK1 |= (1 << OCIE1A);
+  OCR1A =62500; //Prescaler = 64  (12499)
+//  TCCR1B |= (1 << WGM12);
+//  TCCR1B |= (1 << CS11 | 1 << CS10);
+//  TIMSK1 |= (1 << OCIE1A);
+  TCCR1B |= B00000100;
+  TIMSK1 |= B00000010;  
   sei();
 
   pinMode(12, OUTPUT); // Set pin 2 as trigger pin
   digitalWrite(12, LOW); // Set trigger LOW for continuous read
   pinMode(11, INPUT); // Set pin 3 as monitor pin
-
-  MsTimer2::set(500, Lidar_scan); 
-  MsTimer2::start();
+  
 }
-
-void Lidar_scan(){
-  pulseWidth = pulseIn(11, HIGH); // Count how long the pulse is high in microseconds
-  if(pulseWidth != 0){
-    dis= pulseWidth / 20; // 10usec = 1 cm of distance
-  }
-  Serial.println(dis);
-}
-
+int check=0;
 int k; int j; int state;
+int flag=1;
 void loop() {
   t = millis();   
   if(Serial.available()) {
@@ -201,12 +192,29 @@ void loop() {
       k=-1;
       }
   }
+
+  pulseWidth = pulseIn(11, HIGH); // Count how long the pulse is high in microseconds
+    if(pulseWidth != 0){
+      dis = pulseWidth / 20; // 10usec = 1 cm of distance
+    }
+    
   if(dis<30){ //避障
+//    check+=1;
+//    Serial.print("dis:");
+//    Serial.println(dis);
+//    Serial.print("check:");
+//    Serial.println(check);
+//    if(check>=5){ 
       analogWrite(PWMPin, 0);
       RPM_d=0;
+      Serial.println("stoppppppppppp");
+//  }
   }
-  Serial.println(k);
-    if(k==1 && dis>=30){ //直走 + 左轉右動    
+  else{
+    check=0;
+    Serial.print("dis:");
+    Serial.println(dis);
+    if(k==1){ //直走 + 左轉右動
       Theta = EncoderCount / 3200.0;
       dt = (t - t_prev);
       RPM = (Theta - Theta_prev) / (dt / 1000.0) * 60 ;
@@ -250,56 +258,9 @@ void loop() {
       analogWrite(PWMPin, 0);
       RPM_d=0;
     }
-    /*else if(k==2){  //右轉右不動
-      analogWrite(PWMPin, 0);
-      RPM_d=0;
-    }
-    else if(k== -2 && dis>=30){  //左轉右動
-      if(j==1){
-        Theta = EncoderCount / 3200.0;
-        dt = (t - t_prev);
-        RPM = (Theta - Theta_prev) / (dt / 1000.0) * 60 ;
-        RPM_d =RPM_max;
-        //PID
-        e = RPM_d - v1Filt;
-        inte = inte_prev + (dt * (e + e_prev) / 2);
-        V = kp * e + ki * inte + (kd * (e - e_prev) / dt) ;
-        if (V > Vmax) {
-          V = Vmax;
-          inte = inte_prev;
-        }
-        if (V < Vmin) {
-          V = Vmin;
-          inte = inte_prev;
-        }
-        //give the correct V
-        WriteDriverVoltage(V, Vmax);
-        // Low-pass filter (25 Hz cutoff)
-        v1Filt = 0.854*v1Filt + 0.0728*RPM + 0.0728*v1Prev;
-        v1Prev = RPM;
-        //output
-        Serial.print(RPM_d); Serial.print(" \t");
-        Serial.print(v1Filt); Serial.print(" \t ");
-        //Serial.print(EncoderCount); Serial.print(" \t ");
-        //Serial.print(V); Serial.print("\t  ");
-        Serial.print(e); Serial.println("  ");
-          
-        Theta_prev = Theta;
-        count_prev = count;
-        t_prev = t;
-        inte_prev = inte;
-        e_prev = e;
-      }
-      if(j==0){
-        analogWrite(PWMPin, 0);
-        delay(500);
-        RPM_d=0;
-        j=1;
-      }
-    }*/ 
+  } 
 }
 
 ISR(TIMER1_COMPA_vect) {
-  count++;
-  //Serial.print(count * 0.05); Serial.print(" \t");
+    count++; 
 }
